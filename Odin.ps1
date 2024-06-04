@@ -138,7 +138,39 @@ function Get-System {
 
 # Get Application, System and Security
 function Get-WindowsLogs {
+    param (
+        [string]$path
+    )
+    # Creates Windows Event Logs directory
+    New-Item -Path "$path" -Name "Windows Event Log" -ItemType Directory -Force | Out-Null
+    Write-Host "$(Get-Dots) Windows Event Log directory created: $path\Windows Event Log"; Add-Log -message "[+] $(Get-CurrentTime) - Windows Event Log directory created OK" -path $path
+    # Define what Windows Event Log to extract:
+    $logs = 'Application', 'System', 'Security'
+    $allEntries = @()
+    # Extracts last 7 days
+    $startDate = (Get-Date).AddDays(-7)
+    foreach ($artifact in $logs) {
+        # Add info to output
+        Write-Host "$(Get-Dots) Starting to extract $artifact artifact..."
+        # Add info to log
+        Add-Log -message "[+] $(Get-CurrentTime) - Starting to extract $artifact artifact..." -path $path
+        
+        # Export events to .evtx file
+        $evtxPath = "$path\Windows Event Log\$artifact.evtx"
+        wevtutil epl $artifact $evtxPath
+        Write-Host "$(Get-Dots) $artifact events exported to $evtxPath"
+        Add-Log -message "[+] $(Get-CurrentTime) - $artifact events exported to $evtxPath" -path $path
 
+        # Get events per artifact
+        $entries = Get-WinEvent -FilterHashtable @{LogName=$artifact; StartTime=$startDate} | Select-Object TimeCreated, Id, LevelDisplayName, Message
+        $allEntries += $entries
+
+        # Export all events to csv file
+        $csvPath = "$path\Windows Event Log\AllEvents.csv"
+        $allEntries | Export-Csv -Path $csvPath -NoTypeInformation
+    }
+    Write-Host "$(Get-Dots) All events exported to $csvPath"
+    Add-Log -message "[+] $(Get-CurrentTime) - All events exported to $csvPath" -path $path
 }
 
 
@@ -174,7 +206,17 @@ if ($isAdmin) {
 }
 
 
+function Invoke-WithoutAdminPrivilege {
+    Get-System -path $WorkingFolder
+}
 
+function Invoke-WithAdminPrivilege {
+    Get-WindowsLogs -path $WorkingFolder
+}
 
-Get-System -path $WorkingFolder
+Invoke-WithoutAdminPrivilege
+if ($isAdmin) {
+    Invoke-WithAdminPrivilege
+}
+
 ConvertTo-Zip -folderPath $WorkingFolder
