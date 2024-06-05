@@ -71,6 +71,22 @@ function Get-CurrentTime {
     Get-Date -Format "yyyy-MM-dd HH:mm:ss K"
 }
 
+function Check-Execution {
+    param (
+        [string]$result,
+        [string]$artifact
+    )
+    if ($result -eq $false) {
+        Write-Host " - " -NoNewline
+        Write-Host "Failed" -ForegroundColor Red
+        Add-Log -message "[+] $(Get-CurrentTime) - $artifact couldn't be copied!!" -path $path
+    } else {
+        Write-Host " - " -NoNewline
+        Write-Host "OK" -ForegroundColor Green
+        Add-Log -message "[+] $(Get-CurrentTime) - $artifact copied OK" -path $path
+    }
+}
+
 # Extracts information about the status and configuration of the endpoint
 function Get-System {
     param (
@@ -78,62 +94,62 @@ function Get-System {
     )
     # Creates System information directory
     New-Item -Path "$path" -Name "System Information" -ItemType Directory -Force | Out-Null
-    Write-Host "$(Get-Dots) System Information directory created: $path\System Information"; Add-Log -message "[+] $(Get-CurrentTime) - System Information directory created OK" -path $path
+    Write-Host "$(Get-Dots) System Information directory created: $path\System Information"; Add-Log -message "[+] $(Get-CurrentTime) - System Information directory created: $path\System Information" -path $path
     Add-Log -message "[+] $(Get-CurrentTime) - Starting to extract system artifacts from the endpoint..." -path $path
     # Computer Info
-    Write-Host "$(Get-Dots) Obtaining Computer Information..."
-    Get-ComputerInfo >> "$path\System Information\ComputerInfo.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Computer information copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining Computer Information" -NoNewline
+    Get-ComputerInfo >> "$path\System Information\ComputerInfo.txt" ; Check-Execution -result $? -artifact "Computer information"
     # NetIPConfiguration
-    Write-Host "$(Get-Dots) Obtaining Network Configuration..."
-    Get-NetIPConfiguration >> "$path\System Information\NetIPConfiguration.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - IP configuration copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining Network Configuration" -NoNewline
+    Get-NetIPConfiguration >> "$path\System Information\NetIPConfiguration.txt" ; Check-Execution -result $? -artifact "Network configuration"
     # Active connections
-    Write-Host "$(Get-Dots) Obtaining active network connections..."
-    Get-NetTCPConnection >> "$path\System Information\Active Connections.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Active connections copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining active network connections" -NoNewline
+    Get-NetTCPConnection >> "$path\System Information\Active Connections.txt" ; Check-Execution -result $? -artifact "Active connections"
     # Firewall Rules
-    Write-Host "$(Get-Dots) Searching for firewall rules..."
-    Get-NetFirewallRule >> "$path\System Information\Firewall Rules.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Firewalls rules copied OK" -path $path
+    Write-Host "$(Get-Dots) Searching for firewall rules" -NoNewline
+    Get-NetFirewallRule -ErrorAction SilentlyContinue >> "$path\System Information\Firewall Rules.txt" ; Check-Execution -result $? -artifact "Firewall rules"
     # IP Address
-    Write-Host "$(Get-Dots) Obtaining Network Information..."
-    Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - IP address information copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining Network Information" -NoNewline
+    Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Check-Execution -result $? -artifact "Firewall rules"
     # Running processes 
-    Write-Host "$(Get-Dots) Obtaining running processes..."
-    Get-Process >> "$path\System Information\Running Processes.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Running processes copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining running processes" -NoNewline
+    Get-Process >> "$path\System Information\Running Processes.txt" ; Check-Execution -result $? -artifact "Running processes"
     # Network Shares
-    Write-Host "$(Get-Dots) Obtaining network shares..."
-    Get-ChildItem -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Network shares copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining network shares" -NoNewline
+    Get-ChildItem -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Check-Execution -result $? -artifact "Network shares"
     # SMB Shares
-    Write-Host "$(Get-Dots) Obtaining SMB shares..."
-    Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - SMB Shares copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining SMB shares" -NoNewline
+    Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Check-Execution -result $? -artifact "SMB shares"
     # RDP Sessions
-    Write-Host "$(Get-Dots) Looking for RDP Sessions..."
-    qwinsta /server:localhost >> "$path\System Information\RDP Sessions.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - RDP Sessions copied OK" -path $path
+    Write-Host "$(Get-Dots) Looking for RDP Sessions" -NoNewline
+    qwinsta /server:localhost >> "$path\System Information\RDP Sessions.txt" ; Check-Execution -result $? -artifact "RDP sessions"
     # Running Services
-    Write-Host "$(Get-Dots) Looking for running services..."
-    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Running services copied OK" -path $path
+    Write-Host "$(Get-Dots) Looking for running services" -NoNewline
+    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Check-Execution -result $? -artifact "Running services"
     # Installed Programs
-    Write-Host "$(Get-Dots) Checking installed programs..."
-    Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Installed Programs copied OK" -path $path
+    Write-Host "$(Get-Dots) Checking installed programs" -NoNewline 
+    Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Check-Execution -result $? -artifact "Installed programs"
     # Schedule Tasks
-    Write-Host "$(Get-Dots) Obtaining scheduled tasks..."
-    Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Scheduled tasks copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining scheduled tasks" -NoNewline
+    Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Check-Execution -result $? -artifact "Scheduled tasks"
     # Active users / Kerberos Sessions
-    Write-Host "$(Get-Dots) Obtaining active users / Kerberos sessions..."
-    query user /server:$server >> "$path\System Information\Active Users.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Active users copied OK" -path $path
+    Write-Host "$(Get-Dots) Obtaining active users / Kerberos sessions" -NoNewline
+    query user /server:$server >> "$path\System Information\Active Users.txt" ; Check-Execution -result $? -artifact "Active users"
     # Administrator users
-    Write-Host "$(Get-Dots) Looking for administrator users..."
-    $language = (Get-WinSystemLocale).Name; if ($language -match 'es-') { $adminGroupName = "Administradores" } else { $adminGroupName = "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath -Encoding utf8; Add-Log -message "[+] $(Get-CurrentTime) - Administrator users copied OK" -path $path
+    Write-Host "$(Get-Dots) Looking for administrator users" -NoNewline
+    $language = (Get-WinSystemLocale).Name; if ($language -match 'es-') { $adminGroupName = "Administradores" } else { $adminGroupName = "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath -Encoding utf8; Check-Execution -result $? -artifact "Administrator users"
     # Local users
-    Write-Host "$(Get-Dots) Detecting local users..."
-    Get-LocalUser | Format-Table >> "$path\System Information\Active Users.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Local users copied OK" -path $path
+    Write-Host "$(Get-Dots) Detecting local users" -NoNewline
+    Get-LocalUser | Format-Table >> "$path\System Information\Active Users.txt" ; Check-Execution -result $? -artifact "Active users"
     # Process CommandLine
-    Write-Host "$(Get-Dots) Searching for process command lines..."
-    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Processes commandLines copied OK" -path $path
+    Write-Host "$(Get-Dots) Searching for process command lines" -NoNewline
+    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Check-Execution -result $? -artifact "Processes commandlines"
     # Powershell History
-    Write-Host "$(Get-Dots) Extracting Powershell history..."
-    Get-History >> "$path\System Information\Powershell History.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Powershell history copied OK" -path $path
-    # Recently installed software
-    Write-Host "$(Get-Dots) Extracting recently installed software..."
-    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Add-Log -message "[+] $(Get-CurrentTime) - Recently installed software copied OK" -path $path
+    Write-Host "$(Get-Dots) Extracting Powershell history" -NoNewline
+    Get-History >> "$path\System Information\Powershell History.txt" ; Check-Execution -result $? -artifact "Powershell history"
+    # Recently installed softw 
+    Write-Host "$(Get-Dots) Extracting recently installed software" -NoNewline
+    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Check-Execution -result $? -artifact "Recently installed software"
 }
 
 # Get Application, System and Security
