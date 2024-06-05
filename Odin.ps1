@@ -86,7 +86,7 @@ function Invoke-CheckExecutionAfterCompressing {
         Write-Host "[FAIL]" -ForegroundColor Red -NoNewline
         Write-Host " Evidences failed to compressed"
     } else {
-        Write-Host "[OK]" -ForegroundColor Green -NoNewline
+        Write-Host "    - [OK]" -ForegroundColor Green -NoNewline
         Write-Host " Evidences compressed in: $folderPath.zip"
     }
 }
@@ -157,25 +157,33 @@ function Get-System {
     Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes
     Write-Host " Network Information"  
     
+    # DNS Cache
+    Get-DnsClientCache | Format-List >> "$path\System Information\DNS Cache.txt" ; Invoke-CheckExecution -result $? -artifact "DNS cache" -tab yes
+    Write-Host " DNS cache" 
+
     # Running processes  
     Get-Process >> "$path\System Information\Running Processes.txt" ; Invoke-CheckExecution -result $? -artifact "Running processes" -tab yes
     Write-Host " Running processes" 
     
+    # Running Services
+    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Invoke-CheckExecution -result $? -artifact "Running services" -tab yes
+    Write-Host " Running services"  
+
+    # Process CommandLine
+    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Invoke-CheckExecution -result $? -artifact "Processes commandlines" -tab yes
+    Write-Host " Process command lines"  
+
     # Network Shares
     Get-ChildItem -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Invoke-CheckExecution -result $? -artifact "Network shares" -tab yes
     Write-Host " Network shares"  
 
     # SMB Shares
     Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Invoke-CheckExecution -result $? -artifact "SMB shares" -tab yes
-    Write-Host " SMB shares"  
+    Write-Host " SMB shares"   
 
-    # RDP Sessions
-    qwinsta /server:localhost >> "$path\System Information\Open Sessions.txt" ; Invoke-CheckExecution -result $? -artifact "Open sessions" -tab yes
-    Write-Host " Open Sessions"   
-
-    # Running Services
-    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Invoke-CheckExecution -result $? -artifact "Running services" -tab yes
-    Write-Host " Running services"  
+    # Recently installed software
+    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Invoke-CheckExecution -result $? -artifact "Recently installed software" -tab yes
+    Write-Host " Recently installed software" 
 
     # Installed Programs
     Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Invoke-CheckExecution -result $? -artifact "Installed programs" -tab yes
@@ -185,29 +193,17 @@ function Get-System {
     Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Invoke-CheckExecution -result $? -artifact "Scheduled tasks" -tab yes
     Write-Host " Scheduled tasks"  
 
-    # Administrator users
-    $language = (Get-WinSystemLocale).Name; $adminGroupName = if ($language -match 'es-') { "Administradores" } else { "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator_Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath ; Invoke-CheckExecution -result $? -artifact "Administrator users" -tab yes
-    Write-Host " Administrator users"  
-
     # Local users
     Get-LocalUser | Format-Table >> "$path\System Information\Local Users.txt" ; Invoke-CheckExecution -result $? -artifact "Active users" -tab yes
     Write-Host " Local users"  
 
-    # Process CommandLine
-    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Invoke-CheckExecution -result $? -artifact "Processes commandlines" -tab yes
-    Write-Host " Process command lines"  
+    # Administrator users
+    $language = (Get-WinSystemLocale).Name; $adminGroupName = if ($language -match 'es-') { "Administradores" } else { "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator_Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath ; Invoke-CheckExecution -result $? -artifact "Administrator users" -tab yes
+    Write-Host " Administrator users" 
 
-    # Powershell History
-    Get-History >> "$path\System Information\Powershell History.txt" ; Invoke-CheckExecution -result $? -artifact "Powershell history" -tab yes
-    Write-Host " Powershell history"  
-
-    # Recently installed software
-    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Invoke-CheckExecution -result $? -artifact "Recently installed software" -tab yes
-    Write-Host " Recently installed software" 
-
-    # DNS Cache
-    Get-DnsClientCache | Format-List >> "$path\System Information\DNS Cache.txt" ; Invoke-CheckExecution -result $? -artifact "DNS cache" -tab yes
-    Write-Host " DNS cache" 
+    # RDP Sessions
+    qwinsta /server:localhost >> "$path\System Information\Open Sessions.txt" ; Invoke-CheckExecution -result $? -artifact "Open sessions" -tab yes
+    Write-Host " Open Sessions"  
 }
 
 # Get Event Viewer Log
@@ -237,6 +233,29 @@ function Get-EventViewerFiles {
         Write-Host " $($artifactName)"
     }
 } 
+
+# Powershell history from all users
+function Get-AllPowershellHistory {
+    param (
+        [string]$path
+    )
+    Write-Host "$(Invoke-InfoDot) Collecting all powershell histories from all users..."
+    $PowershellConsoleHistory = "$path\All PowerShell History"
+    # Specify the directory where user profiles are stored
+    $usersDirectory = "C:\Users"
+    # Get a list of all user directories in C:\Users
+    $userDirectories = Get-ChildItem -Path $usersDirectory -Directory
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Started to extract all users powershell history..." -path "$folderPath"
+    foreach ($userDir in $userDirectories) {
+        $historyFilePath = Join-Path -Path $userDir.FullName -ChildPath "AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
+        if (Test-Path -Path $historyFilePath -PathType Leaf) {
+            $outputDirectory = "$PowershellConsoleHistory\$userDir.Name" ; Invoke-CheckExecution -result $? -artifact "$($userDir.FullName) powershell history" -tab yes -path $path
+            Write-Host " Powershell history from '$($userDir.Name)'"
+            mkdir -Force $outputDirectory | Out-Null
+            Copy-Item -Path $historyFilePath -Destination $outputDirectory -Force
+            }
+        }
+}  
 
 # Check for Administrator privileges
 $isAdmin = [bool](New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -275,7 +294,7 @@ function Invoke-WithoutAdminPrivilege {
 
 function Invoke-WithAdminPrivilege {
     Get-EventViewerFiles -path $WorkingFolder
-    #Get-WindowsLogs -path $WorkingFolder
+    Get-AllPowershellHistory -path $WorkingFolder
 }
 
 Invoke-WithoutAdminPrivilege
