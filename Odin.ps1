@@ -5,6 +5,17 @@
 #   Description: Extracts forensics artifacts in csv format in Windows endpoints         #
 ##########################################################################################
 
+# Clear possible previous failed attempts of ODIN execution
+function Invoke-Clear {
+    $CurrentPath = $pwd
+    $ExecutionTime = $(get-date -f yyyy-MM-dd)
+    $WorkingFolder = "$CurrentPath\DFIR-$env:computername-$ExecutionTime"
+    if (Test-Path $WorkingFolder) {
+        Remove-Item -Path $WorkingFolder -Force -Recurse
+    }
+}
+
+Invoke-Clear
 
 $Version = '1.0'
 $ASCIIBanner = @"                                                                                                                                                              
@@ -31,29 +42,52 @@ Write-Host "Version: $Version" -ForegroundColor Cyan
 Write-Host "Coded by Worldsleaks" -ForegroundColor Cyan
 Write-Host "===================================================================================================`n" -ForegroundColor Green
 
-# Give color points to output results
-function Get-Dots {
-    Write-Host "[+]" -ForegroundColor Cyan -NoNewline
+function Invoke-InfoDot {
+    Write-Host "[INFO]" -ForegroundColor Cyan -NoNewline
 }
 
-# Zip evidences and delete working directory
-function ConvertTo-Zip {
+function Invoke-WarningDot {
+    Write-Host "[WARN]" -ForegroundColor Yellow -NoNewline
+}
+
+function Invoke-CheckExecution {
     param (
-        [string]$folderPath
+        [string]$result,
+        [string]$artifact,
+        [string]$tab
     )
-    Write-Host "$(Get-Dots) Compressing evidences..."
-    # Zip evidences stored in output directory
-    Add-Log -message "[+] $(Get-CurrentTime) - Started to compress evidences in: $folderPath.zip" -path "$folderPath"
-    Compress-Archive -Force -LiteralPath $folderPath -DestinationPath "$folderPath.zip"
-    Write-Host "$(Get-Dots) Evidences compressed in: $folderPath.zip"
-    
-    # Remove the output directory once the evidences are compressed
-    Remove-Item -LiteralPath $folderPath -Force -Recurse
-    if ($? -eq $true) {
-        Write-Host "$(Get-Dots) Output directory deleted"
-        Write-Host "$(Get-Dots) Exiting..."
+    if ($tab -eq "yes") {
+        # Activated tab
+        if ($result -eq $false) {
+            Write-Host "    - [FAIL]" -ForegroundColor Red -NoNewline
+            Add-Log -message " [FAIL] $(Get-CurrentTime) - $artifact couldn't be copied!!" -path $path
+        } else {
+            Write-Host "    - [OK]" -ForegroundColor Green -NoNewline
+            Add-Log -message "[OK] $(Get-CurrentTime) - $artifact copied" -path $path
+        }
     } else {
-        Write-Host "$(Get-Dots) Failed to delete the output directory!"
+        # Non activated tab
+        if ($result -eq $false) {
+            Write-Host "[FAIL]" -ForegroundColor Red -NoNewline
+            Add-Log -message "[FAIL] $(Get-CurrentTime) - $artifact couldn't be copied!!" -path $path
+        } else {
+            Write-Host "[OK]" -ForegroundColor Green -NoNewline
+            Add-Log -message "[OK] $(Get-CurrentTime) - $artifact copied" -path $path
+        }
+    }
+}
+
+function Invoke-CheckExecutionAfterCompressing {
+    param (
+        [string]$result,
+        [string]$folderpath
+    )
+    if ($result -eq $false) {
+        Write-Host "[FAIL]" -ForegroundColor Red -NoNewline
+        Write-Host " Evidences failed to compressed"
+    } else {
+        Write-Host "[OK]" -ForegroundColor Green -NoNewline
+        Write-Host " Evidences compressed in: $folderPath.zip"
     }
 }
 
@@ -66,25 +100,29 @@ function Add-Log {
     Add-Content -Path "$path\Odin.log" -Value "$message"
 }
 
+# Zip evidences and delete working directory
+function ConvertTo-Zip {
+    param (
+        [string]$folderPath
+    )
+    Write-Host "$(Invoke-InfoDot) Compressing evidences..."
+    # Zip evidences stored in output directory
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Started to compress evidences in: $folderPath.zip" -path "$folderPath"
+    Compress-Archive -Force -LiteralPath $folderPath -DestinationPath "$folderPath.zip" ; Invoke-CheckExecutionAfterCompressing -result $? -folderpath $folderPath
+    
+    # Remove the output directory once the evidences are compressed
+    Remove-Item -LiteralPath $folderPath -Force -Recurse
+    if ($? -eq $true) {
+        Write-Host "$(Invoke-InfoDot) Output directory deleted"
+        Write-Host "$(Invoke-InfoDot) Exiting..."
+    } else {
+        Write-Host "$(Invoke-InfoDot) Failed to delete the output directory!"
+    }
+}
+
 # Get Current time for logging
 function Get-CurrentTime {
     Get-Date -Format "yyyy-MM-dd HH:mm:ss K"
-}
-
-function Check-Execution {
-    param (
-        [string]$result,
-        [string]$artifact
-    )
-    if ($result -eq $false) {
-        Write-Host " - " -NoNewline
-        Write-Host "Failed" -ForegroundColor Red
-        Add-Log -message "[+] $(Get-CurrentTime) - $artifact couldn't be copied!!" -path $path
-    } else {
-        Write-Host " - " -NoNewline
-        Write-Host "OK" -ForegroundColor Green
-        Add-Log -message "[+] $(Get-CurrentTime) - $artifact copied OK" -path $path
-    }
 }
 
 # Extracts information about the status and configuration of the endpoint
@@ -94,62 +132,78 @@ function Get-System {
     )
     # Creates System information directory
     New-Item -Path "$path" -Name "System Information" -ItemType Directory -Force | Out-Null
-    Write-Host "$(Get-Dots) System Information directory created: $path\System Information"; Add-Log -message "[+] $(Get-CurrentTime) - System Information directory created: $path\System Information" -path $path
-    Add-Log -message "[+] $(Get-CurrentTime) - Starting to extract system artifacts from the endpoint..." -path $path
+    Add-Log -message "[INFO] $(Get-CurrentTime) - System Information directory created: $path\System Information" -path $path
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Starting to extract system artifacts from the endpoint..." -path $path
+    
+    Write-Host "$(Invoke-InfoDot) Starting to extract the characteristics of the environment..."
+
     # Computer Info
-    Write-Host "$(Get-Dots) Obtaining Computer Information" -NoNewline
-    Get-ComputerInfo >> "$path\System Information\ComputerInfo.txt" ; Check-Execution -result $? -artifact "Computer information"
+    Get-ComputerInfo >> "$path\System Information\ComputerInfo.txt" ; Invoke-CheckExecution -result $? -artifact "Computer information" -tab yes    
+    Write-Host " Computer Information"
+    
     # NetIPConfiguration
-    Write-Host "$(Get-Dots) Obtaining Network Configuration" -NoNewline
-    Get-NetIPConfiguration >> "$path\System Information\NetIPConfiguration.txt" ; Check-Execution -result $? -artifact "Network configuration"
+    Get-NetIPConfiguration >> "$path\System Information\NetIPConfiguration.txt" ; Invoke-CheckExecution -result $? -artifact "Network configuration" -tab yes
+    Write-Host " Network Configuration"
+
     # Active connections
-    Write-Host "$(Get-Dots) Obtaining active network connections" -NoNewline
-    Get-NetTCPConnection >> "$path\System Information\Active Connections.txt" ; Check-Execution -result $? -artifact "Active connections"
+    Get-NetTCPConnection >> "$path\System Information\Active Connections.txt" ; Invoke-CheckExecution -result $? -artifact "Active connections" -tab yes
+    Write-Host " Active network connections"  
+    
     # Firewall Rules
-    Write-Host "$(Get-Dots) Searching for firewall rules" -NoNewline
-    Get-NetFirewallRule -ErrorAction SilentlyContinue >> "$path\System Information\Firewall Rules.txt" ; Check-Execution -result $? -artifact "Firewall rules"
+    Get-NetFirewallRule -ErrorAction SilentlyContinue >> "$path\System Information\Firewall Rules.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes
+    Write-Host " Firewall rules"  
+    
     # IP Address
-    Write-Host "$(Get-Dots) Obtaining Network Information" -NoNewline
-    Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Check-Execution -result $? -artifact "Firewall rules"
-    # Running processes 
-    Write-Host "$(Get-Dots) Obtaining running processes" -NoNewline
-    Get-Process >> "$path\System Information\Running Processes.txt" ; Check-Execution -result $? -artifact "Running processes"
+    Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes
+    Write-Host " Network Information"  
+    
+    # Running processes  
+    Get-Process >> "$path\System Information\Running Processes.txt" ; Invoke-CheckExecution -result $? -artifact "Running processes" -tab yes
+    Write-Host " Running processes" 
+    
     # Network Shares
-    Write-Host "$(Get-Dots) Obtaining network shares" -NoNewline
-    Get-ChildItem -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Check-Execution -result $? -artifact "Network shares"
+    Get-ChildItem -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Invoke-CheckExecution -result $? -artifact "Network shares" -tab yes
+    Write-Host " Network shares"  
+
     # SMB Shares
-    Write-Host "$(Get-Dots) Obtaining SMB shares" -NoNewline
-    Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Check-Execution -result $? -artifact "SMB shares"
+    Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Invoke-CheckExecution -result $? -artifact "SMB shares" -tab yes
+    Write-Host " SMB shares"  
+
     # RDP Sessions
-    Write-Host "$(Get-Dots) Looking for RDP Sessions" -NoNewline
-    qwinsta /server:localhost >> "$path\System Information\RDP Sessions.txt" ; Check-Execution -result $? -artifact "RDP sessions"
+    qwinsta /server:localhost >> "$path\System Information\Open Sessions.txt" ; Invoke-CheckExecution -result $? -artifact "Open sessions" -tab yes
+    Write-Host " Open Sessions"   
+
     # Running Services
-    Write-Host "$(Get-Dots) Looking for running services" -NoNewline
-    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Check-Execution -result $? -artifact "Running services"
+    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Invoke-CheckExecution -result $? -artifact "Running services" -tab yes
+    Write-Host " Running services"  
+
     # Installed Programs
-    Write-Host "$(Get-Dots) Checking installed programs" -NoNewline 
-    Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Check-Execution -result $? -artifact "Installed programs"
+    Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Invoke-CheckExecution -result $? -artifact "Installed programs" -tab yes
+    Write-Host " Installed programs"   
+
     # Schedule Tasks
-    Write-Host "$(Get-Dots) Obtaining scheduled tasks" -NoNewline
-    Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Check-Execution -result $? -artifact "Scheduled tasks"
-    # Active users / Kerberos Sessions
-    Write-Host "$(Get-Dots) Obtaining active users / Kerberos sessions" -NoNewline
-    query user /server:$server >> "$path\System Information\Active Users.txt" ; Check-Execution -result $? -artifact "Active users"
+    Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Invoke-CheckExecution -result $? -artifact "Scheduled tasks" -tab yes
+    Write-Host " Scheduled tasks"  
+
     # Administrator users
-    Write-Host "$(Get-Dots) Looking for administrator users" -NoNewline
-    $language = (Get-WinSystemLocale).Name; if ($language -match 'es-') { $adminGroupName = "Administradores" } else { $adminGroupName = "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath -Encoding utf8; Check-Execution -result $? -artifact "Administrator users"
+    $language = (Get-WinSystemLocale).Name; $adminGroupName = if ($language -match 'es-') { "Administradores" } else { "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator_Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath ; Invoke-CheckExecution -result $? -artifact "Administrator users" -tab yes
+    Write-Host " Administrator users"  
+
     # Local users
-    Write-Host "$(Get-Dots) Detecting local users" -NoNewline
-    Get-LocalUser | Format-Table >> "$path\System Information\Active Users.txt" ; Check-Execution -result $? -artifact "Active users"
+    Get-LocalUser | Format-Table >> "$path\System Information\Local Users.txt" ; Invoke-CheckExecution -result $? -artifact "Active users" -tab yes
+    Write-Host " Local users"  
+
     # Process CommandLine
-    Write-Host "$(Get-Dots) Searching for process command lines" -NoNewline
-    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Check-Execution -result $? -artifact "Processes commandlines"
+    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Invoke-CheckExecution -result $? -artifact "Processes commandlines" -tab yes
+    Write-Host " Process command lines"  
+
     # Powershell History
-    Write-Host "$(Get-Dots) Extracting Powershell history" -NoNewline
-    Get-History >> "$path\System Information\Powershell History.txt" ; Check-Execution -result $? -artifact "Powershell history"
-    # Recently installed softw 
-    Write-Host "$(Get-Dots) Extracting recently installed software" -NoNewline
-    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Check-Execution -result $? -artifact "Recently installed software"
+    Get-History >> "$path\System Information\Powershell History.txt" ; Invoke-CheckExecution -result $? -artifact "Powershell history" -tab yes
+    Write-Host " Powershell history"  
+
+    # Recently installed software
+    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Invoke-CheckExecution -result $? -artifact "Recently installed software" -tab yes
+    Write-Host " Recently installed software"  
 }
 
 # Get Application, System and Security
@@ -159,66 +213,51 @@ function Get-WindowsLogs {
     )
     # Creates Windows Event Logs directory
     New-Item -Path "$path" -Name "Windows Event Log" -ItemType Directory -Force | Out-Null
-    Write-Host "$(Get-Dots) Windows Event Log directory created: $path\Windows Event Log"; Add-Log -message "[+] $(Get-CurrentTime) - Windows Event Log directory created OK" -path $path
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Windows Event Log directory created OK" -path $path
     # Define what Windows Event Log to extract:
     $logs = 'Application', 'System', 'Security'
-    $allEntries = @()
-    # Extracts last 7 days
-    $startDate = (Get-Date).AddDays(-7)
+
+    Write-Host "$(Invoke-InfoDot) Starting to extract Windows Event Log..."
     foreach ($artifact in $logs) {
-        # Add info to output
-        Write-Host "$(Get-Dots) Starting to extract $artifact artifact..."
         # Add info to log
-        Add-Log -message "[+] $(Get-CurrentTime) - Starting to extract $artifact artifact..." -path $path
+        Add-Log -message "[INFO] $(Get-CurrentTime) - Starting to extract $artifact.evtx..." -path $path
         
         # Export events to .evtx file
         $evtxPath = "$path\Windows Event Log\$artifact.evtx"
-        wevtutil epl $artifact $evtxPath
-        Write-Host "$(Get-Dots) $artifact events exported to $evtxPath"
-        Add-Log -message "[+] $(Get-CurrentTime) - $artifact events exported to $evtxPath" -path $path
-
-        # Get events per artifact
-        $entries = Get-WinEvent -FilterHashtable @{LogName=$artifact; StartTime=$startDate} | Select-Object TimeCreated, Id, LevelDisplayName, Message
-        $allEntries += $entries
-
-        # Export all events to csv file
-        $csvPath = "$path\Windows Event Log\AllEvents.csv"
-        $allEntries | Export-Csv -Path $csvPath -NoTypeInformation
+        wevtutil epl $artifact $evtxPath ; Invoke-CheckExecution -result $? -artifact $artifact -tab yes
+        Write-Host " $artifact.evtx"
     }
-    Write-Host "$(Get-Dots) All events exported to $csvPath"
-    Add-Log -message "[+] $(Get-CurrentTime) - All events exported to $csvPath" -path $path
 }
-
 
 
 # Check for Administrator privileges
 $isAdmin = [bool](New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 if ($isAdmin) {
-    Write-Host "$(Get-Dots) Session with administrator privileges created"
+    Write-Host "$(Invoke-InfoDot) Session with administrator privileges created"
 } else {
-    Write-Host "$(Get-Dots) No administrator privileges detected. Use administrator privileges for the extraction of all artifacts!!"
-    Write-Host "$(Get-Dots) Non administrator session created..."
+    Write-Host "$(Invoke-WarningDot) No administrator privileges detected. Use administrator privileges for the extraction of all artifacts!!"
+    Write-Host "$(Invoke-WarningDot) Non administrator session created..."
 }
 
-Write-Host "$(Get-Dots) Creating output directory..."
+Write-Host "$(Invoke-InfoDot) Creating output directory..."
 $CurrentPath = $pwd
 $ExecutionTime = $(get-date -f yyyy-MM-dd)
 $WorkingFolder = "$CurrentPath\DFIR-$env:computername-$ExecutionTime"
 mkdir -Force $WorkingFolder | Out-Null
-Write-Host "$(Get-Dots) Output directory created: $WorkingFolder"
-Add-Log -message "[+] $(Get-CurrentTime) - Output directory created - $WorkingFolder" -path $WorkingFolder
+Write-Host "$(Invoke-InfoDot) Output directory created: $WorkingFolder"
+Add-Log -message "[INFO] $(Get-CurrentTime) - Output directory created - $WorkingFolder" -path $WorkingFolder
 
 # Detects current user and SID
 $currentUsername = (Get-WmiObject Win32_Process -f 'Name="explorer.exe"').GetOwner().User
 $currentUserSid = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*' | Where-Object {$_.PSChildName -match 'S-1-5-21-\d+-\d+\-\d+\-\d+$' -and $_.ProfileImagePath -match "\\$currentUsername$"} | ForEach-Object{$_.PSChildName}
-Write-Host "$(Get-Dots) Current user detected: $currentUsername ($currentUserSid)"
-Add-Log -message "[+] $(Get-CurrentTime) - Current user detected: $currentUsername ($currentUserSid)" -path $WorkingFolder
+Write-Host "$(Invoke-InfoDot) Current user detected: $currentUsername ($currentUserSid)"
+Add-Log -message "[INFO] $(Get-CurrentTime) - Current user detected: $currentUsername ($currentUserSid)" -path $WorkingFolder
 # Log if current user has admin privs
 if ($isAdmin) {
-    Add-Log -message "[+] $(Get-CurrentTime) - Current user has Administrator rights" -path $WorkingFolder
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Current user has Administrator rights" -path $WorkingFolder
 } else {
-    Add-Log -message "[+] $(Get-CurrentTime) - Current user doesn't have Administrator rights" -path $WorkingFolder
+    Add-Log -message "[WARN] $(Get-CurrentTime) - Current user doesn't have Administrator rights" -path $WorkingFolder
 }
 
 
