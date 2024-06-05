@@ -203,32 +203,40 @@ function Get-System {
 
     # Recently installed software
     Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Invoke-CheckExecution -result $? -artifact "Recently installed software" -tab yes
-    Write-Host " Recently installed software"  
+    Write-Host " Recently installed software" 
+
+    # DNS Cache
+    Get-DnsClientCache | Format-List >> "$path\System Information\DNS Cache.txt" ; Invoke-CheckExecution -result $? -artifact "DNS cache" -tab yes
+    Write-Host " DNS cache" 
 }
 
-# Get Application, System and Security
-function Get-WindowsLogs {
+# Get Event Viewer Log
+function Get-EventViewerFiles {
     param (
         [string]$path
     )
-    # Creates Windows Event Logs directory
-    New-Item -Path "$path" -Name "Windows Event Log" -ItemType Directory -Force | Out-Null
-    Add-Log -message "[INFO] $(Get-CurrentTime) - Windows Event Log directory created OK" -path $path
-    # Define what Windows Event Log to extract:
-    $logs = 'Application', 'System', 'Security'
+    Write-Host "$(Invoke-InfoDot) Collecting important Event Viewer Files..."
+    New-Item -Path $path -Name "Event Viewer" -ItemType Directory -Force | Out-Null
+    $EventViewer = "$path\Event Viewer"
+    $evtxPath = "C:\Windows\System32\winevt\Logs"
+    $channels = @(
+        "Application",
+        "Security",
+        "System",
+        "Microsoft-Windows-Sysmon%4Operational",
+        "Microsoft-Windows-TaskScheduler%4Operational",
+        "Microsoft-Windows-PowerShell%4Operational"
+    )
 
-    Write-Host "$(Invoke-InfoDot) Starting to extract Windows Event Log..."
-    foreach ($artifact in $logs) {
-        # Add info to log
-        Add-Log -message "[INFO] $(Get-CurrentTime) - Starting to extract $artifact.evtx..." -path $path
-        
-        # Export events to .evtx file
-        $evtxPath = "$path\Windows Event Log\$artifact.evtx"
-        wevtutil epl $artifact $evtxPath ; Invoke-CheckExecution -result $? -artifact $artifact -tab yes
-        Write-Host " $artifact.evtx"
+    Get-ChildItem "$evtxPath\*.evtx" | Where-Object {$_.BaseName -in $channels} | ForEach-Object {
+        $artifactName = $_.Name
+        $sourcePath = $_.FullName
+        $destinationPath = "$EventViewer\$artifactName"
+        Copy-Item -Path $sourcePath -Destination $destinationPath
+        Invoke-CheckExecution -result $? -artifact $artifactName -tab yes -path $path
+        Write-Host " $($artifactName)"
     }
-}
-
+} 
 
 # Check for Administrator privileges
 $isAdmin = [bool](New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -266,7 +274,8 @@ function Invoke-WithoutAdminPrivilege {
 }
 
 function Invoke-WithAdminPrivilege {
-    Get-WindowsLogs -path $WorkingFolder
+    Get-EventViewerFiles -path $WorkingFolder
+    #Get-WindowsLogs -path $WorkingFolder
 }
 
 Invoke-WithoutAdminPrivilege
