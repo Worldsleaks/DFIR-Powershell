@@ -39,7 +39,8 @@ $ASCIIBanner = @"
 "@
 Write-Host $ASCIIBanner -ForegroundColor Cyan
 Write-Host "Version: $Version" -ForegroundColor Cyan
-Write-Host "Coded by Worldsleaks" -ForegroundColor Cyan
+Write-Host "Coded by Alberto Aparicio (alberto.aparicio@masorange.es)" -ForegroundColor Cyan
+Write-Host "+O Incident Response Team - Tech Ops" -ForegroundColor Cyan
 Write-Host "===================================================================================================`n" -ForegroundColor Green
 
 function Invoke-InfoDot {
@@ -100,7 +101,7 @@ function Add-Log {
         [string]$message,
         [string]$path
     )
-    Add-Content -Path "$path\Odin.log" -Value "$message"
+    Add-Content -Path "$path\Odin.log" -Value "$message" #-ErrorAction SilentlyContinue
 }
 
 # Zip evidences and delete working directory
@@ -108,6 +109,7 @@ function ConvertTo-Zip {
     param (
         [string]$folderPath
     )
+    Write-Host "`n" -NoNewline
     Write-Host "$(Invoke-InfoDot) Compressing evidences..."
     # Zip evidences stored in output directory
     Add-Log -message "[INFO] $(Get-CurrentTime) - Started to compress evidences in: $folderPath.zip" -path "$folderPath"
@@ -116,6 +118,7 @@ function ConvertTo-Zip {
     # Remove the output directory once the evidences are compressed
     Remove-Item -LiteralPath $folderPath -Force -Recurse
     if ($? -eq $true) {
+        Write-Host "`n" -NoNewline
         Write-Host "$(Invoke-InfoDot) Output directory deleted"
         Write-Host "$(Invoke-InfoDot) Exiting..."
     } else {
@@ -138,6 +141,7 @@ function Get-System {
     Add-Log -message "[INFO] $(Get-CurrentTime) - System Information directory created: $path\System Information" -path $path
     Add-Log -message "[INFO] $(Get-CurrentTime) - Starting to extract system artifacts from the endpoint..." -path $path
     
+    Write-Host "`n" -NoNewline
     Write-Host "$(Invoke-InfoDot) Starting to extract the characteristics of the environment..."
 
     # Computer Info
@@ -214,7 +218,9 @@ function Get-EventViewerFiles {
     param (
         [string]$path
     )
+    Write-Host "`n" -NoNewline
     Write-Host "$(Invoke-InfoDot) Collecting important Event Viewer Files..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting important Event Viewer Files..." -path $path
     New-Item -Path $path -Name "Event Viewer" -ItemType Directory -Force | Out-Null
     $EventViewer = "$path\Event Viewer"
     $evtxPath = "C:\Windows\System32\winevt\Logs"
@@ -242,17 +248,18 @@ function Get-AllPowershellHistory {
     param (
         [string]$path
     )
+    Write-Host "`n" -NoNewline
     Write-Host "$(Invoke-InfoDot) Collecting all powershell histories from all users..."
     $PowershellConsoleHistory = "$path\All PowerShell History"
     # Specify the directory where user profiles are stored
     $usersDirectory = "C:\Users"
     # Get a list of all user directories in C:\Users
     $userDirectories = Get-ChildItem -Path $usersDirectory -Directory
-    Add-Log -message "[INFO] $(Get-CurrentTime) - Started to extract all users powershell history..." -path "$folderPath"
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Started to extract all users powershell history..." -path $path
     foreach ($userDir in $userDirectories) {
         $historyFilePath = Join-Path -Path $userDir.FullName -ChildPath "AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
         if (Test-Path -Path $historyFilePath -PathType Leaf) {
-            $outputDirectory = "$PowershellConsoleHistory\$userDir.Name" ; Invoke-CheckExecution -result $? -artifact "$($userDir.FullName) powershell history" -tab yes -path $path
+            $outputDirectory = "$PowershellConsoleHistory\$userDir" ; Invoke-CheckExecution -result $? -artifact "$($userDir) powershell history" -tab yes -path $path
             Write-Host " Powershell history from '$($userDir.Name)'"
             mkdir -Force $outputDirectory | Out-Null
             Copy-Item -Path $historyFilePath -Destination $outputDirectory -Force
@@ -265,44 +272,213 @@ function Get-OutlookCache {
     param (
         [string]$path
     )
-    # Define el directorio raíz para guardar las caches de Outlook
     $rootDestPath = "$path\Outlook Cache"
 
-    # Comienza el proceso de extracción
-    Write-Output "[INFO] Starting to extract Outlook Cache..."
+    Write-Host "`n" -NoNewline
+    Write-Host "$(Invoke-InfoDot) Starting to extract Outlook Cache..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Starting to extract Outlook Cache..." -path $path
 
-    # Obtiene los perfiles de usuario en el sistema
+    # User profiles
     $userProfiles = Get-ChildItem -Path "C:\Users" | Where-Object { $_.PSIsContainer -and $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') }
 
     foreach ($profile in $userProfiles) {
-        # Define la ruta de la cache de Outlook para cada usuario
         $cachePath = "C:\Users\$($profile.Name)\AppData\Local\Microsoft\Windows\INetCache\Content.MSO"
         
-        # Verifica si la ruta de la cache existe
         if (Test-Path -Path $cachePath) {
-            # Define el directorio de destino para la copia de la cache
             $destPath = "$rootDestPath\$($profile.Name)"
             
-            # Intenta crear el directorio de destino y copiar la cache
             try {
                 New-Item -ItemType Directory -Force -Path $destPath | Out-Null
                 Copy-Item -Path "$cachePath\*" -Destination $destPath -Recurse -Force
                 Write-Host "    - [ OK ]" -NoNewline -ForegroundColor Green
-                Write-Host " $($profile.Name)"
+                Write-Host " Outlook cache from '$($profile.Name)'"
             } catch {
                 Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
-                Write-Host " $($profile.Name)"
+                Write-Host " Outlook cache from '$($profile.Name)'"
             }
         } else {
             Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
-            Write-Host " $($profile.Name)"
+            Write-Host " Outlook cache from '$($profile.Name)'"
         }
     }
 }
 
 # Get a listing of the temp files from each user in the system
 function Get-TempFiles {
+    param (
+        [string]$path
+    )
+    Write-Host "`n" -NoNewline
+    Write-Host "$(Invoke-InfoDot) Starting to extract Temp Files..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Starting to extract Temp Files..." -path $path
 
+    New-Item -ItemType Directory -Force -Path $path -Name "Temp Files" | Out-Null
+
+    $userProfiles = Get-ChildItem -Path "C:\Users" -Directory | Where-Object { $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') }
+
+    foreach ($profile in $userProfiles) {
+        $tempPath = "C:\Users\$($profile.Name)\AppData\Local\Temp"
+
+        if (Test-Path -Path $tempPath) {
+            try {
+                Get-ChildItem -Path $tempPath -Recurse | Out-File "$path\Temp Files\$($profile.Name).txt"
+                Write-Host "    - [ OK ]" -NoNewline -ForegroundColor Green
+                Write-Host " Temp files from '$($profile.Name)'"
+            } catch {
+                Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
+                Write-Host " Temp files from '$($profile.Name)' - Error: $_"
+            }
+        } else {
+            Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
+            Write-Host " Temp files from '$($profile.Name)' - Folder does not exist"
+        }
+    }
+}
+
+function Get-ConnectedDevices {
+    param (
+        [string]$path
+    )
+    Write-Host "`n" -NoNewline
+    Write-Host "$(Invoke-InfoDot) Collecting information about Connected Devices..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting information about Connected Devices..." -path $path
+
+    $DeviceFolder = "$path\Connected Devices"
+    New-Item -Path $DeviceFolder -ItemType Directory -Force | Out-Null
+    
+    # Number of PnP devices
+    $recount = (Get-PnpDevice).Count
+    (Get-PnpDevice).Count | Out-Null ; Invoke-CheckExecution -result $? -artifact "Connected Devices" -tab yes -path $path
+    Write-Host " PnP Devices detected: $recount"
+
+    # Extract PnP devices
+    $ConnectedDevicesOutput = "$DeviceFolder\ConnectedDevices.csv"
+    Get-PnpDevice | Export-Csv -NoTypeInformation -Path $ConnectedDevicesOutput ; Invoke-CheckExecution -result $? -artifact "Connected Devices" -tab yes -path $path
+    Write-Host " Information recollected"
+}
+
+function Get-ChromeArtifacts {
+    param(
+        [string]$path
+    )
+
+    Write-Host "`n" -NoNewline
+    Write-Host "$(Invoke-InfoDot) Looking for installed browsers..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Looking for installed browsers..." -path $path
+    New-Item -Path $path -ItemType Directory -Force -Name "Browsers" | Out-Null
+
+    $chromeProfilePath = "$env:LOCALAPPDATA\Google\Chrome\User Data"
+    $profiles = Get-ChildItem -Path $chromeProfilePath -Directory
+
+
+    if (Test-Path $chromeProfilePath) {
+        Write-Host "    - " -NoNewline
+        Write-Host "$(Invoke-InfoDot) Collecting Google Chrome artifacts..."
+        Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting Google Chrome artifacts..." -path $path
+        New-Item -Path "$path\Browsers" -ItemType Directory -Force -Name "Google Chrome" | Out-Null
+        $destinationPath = "$path\Browsers\Google Chrome"
+    
+    
+        foreach ($profile in $profiles) {
+            $profileName = $profile.Name
+            $profilePath = $profile.FullName
+            $profileDestination = Join-Path -Path $destinationPath -ChildPath $profileName
+    
+            # Crear subdirectorio para el perfil si no existe
+            if (-not (Test-Path $profileDestination)) {
+                New-Item -ItemType Directory -Path $profileDestination -Force | Out-Null
+            }
+    
+            # Artefactos específicos para recolectar
+            $artifacts = @(
+                @{ Name = "History"; Path = "History" },
+                @{ Name = "Cookies"; Path = "Cookies" },
+                @{ Name = "Cache"; Path = "Cache" },
+                @{ Name = "Login Data"; Path = "Login Data" },
+                @{ Name = "Extensions"; Path = "Extensions" }
+            )
+    
+            foreach ($artifact in $artifacts) {
+                $filePath = Join-Path -Path $profilePath -ChildPath $artifact.Path
+                $destFilePath = Join-Path -Path $profileDestination -ChildPath $artifact.Name
+    
+                if (Test-Path $filePath) {
+                    if ($artifact.Name -eq "Extensions" -or $artifact.Name -eq "Cache") {
+                        # Para Carpetas
+                        $destDir = Join-Path -Path $profileDestination -ChildPath $artifact.Name
+                        if (Test-Path $destDir) { Remove-Item -Path $destDir -Recurse -Force }
+                        Copy-Item -Path $filePath -Destination $destDir -Recurse -Force
+                    } else {
+                        # Para Archivos
+                        Copy-Item -Path $filePath -Destination $destFilePath -Force
+                    }
+                }
+            }
+        }
+        Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
+        Write-Host " Artifacts have been collected"
+    } else {
+        Write-Host "        - [FAIL]" -NoNewline -ForegroundColor Red
+        Write-Host " Chrome profile path not found: $firefoxProfilePath"
+    }
+}
+
+function Get-FirefoxArtifacts {
+    param (
+        [string]$path
+    )
+    # Comprobar si Firefox está instalado en el sistema mediante el Registro
+    $firefoxRegistryPath = @(
+        "HKLM:\SOFTWARE\Mozilla\Mozilla Firefox",
+        "HKLM:\SOFTWARE\Wow6432Node\Mozilla\Mozilla Firefox"  # Para sistemas de 64 bits que pueden tener Firefox instalado en WOW64
+    )
+    
+    $firefoxInstalled = $false
+
+    foreach ($registry_path in $firefoxRegistryPath) {
+        if (Test-Path $registry_path) {
+            $firefoxInstalled = $true
+            break
+        }
+    }
+
+    if (-not $firefoxInstalled) {
+        return
+    }
+
+    Write-Host "`n" -NoNewline
+    Write-Host "    - " -NoNewline
+    Write-Host "$(Invoke-InfoDot) Collecting Firefox artifacts..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting Firefox artifacts..." -path $path
+    New-Item -Path "$path\Browsers" -ItemType Directory -Force -Name "Mozilla Firefox" | Out-Null
+    $destinationPath = "$path\Browsers\Mozilla Firefox"
+
+    # Ubicación predeterminada de los perfiles de Firefox en Windows
+    $firefoxProfilePath = "$env:APPDATA\Mozilla\Firefox\Profiles"
+
+    if (Test-Path $firefoxProfilePath) {
+        # Obtener todos los perfiles de usuario de Firefox
+        $profiles = Get-ChildItem -Path $firefoxProfilePath -Directory
+
+        foreach ($profile in $profiles) {
+            # Lista de archivos de interés en cada perfil de Firefox
+            $filesOfInterest = @("places.sqlite", "bookmarkbackups\*", "addons.json", "extensions.sqlite", "cookies.sqlite", "logins.json", "key3.db", "key4.db")
+
+            foreach ($file in $filesOfInterest) {
+                $sourceFile = Join-Path -Path $profile.FullName -ChildPath $file
+
+                # Copiar cada archivo encontrado al directorio de destino
+                if (Test-Path $sourceFile) {
+                    Copy-Item -Path $sourceFile -Destination $destinationPath -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+        Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
+        Write-Host " Artifacts have been collected"
+    } else {
+        Write-Host "        - [FAIL]" -NoNewline -ForegroundColor Red
+        Write-Host " Firefox profile path not found: $firefoxProfilePath"
+    }
 }
 
 # Check for Administrator privileges
@@ -337,16 +513,24 @@ if ($isAdmin) {
 
 
 function Invoke-WithoutAdminPrivilege {
+    param(
+        [Parameter(Mandatory=$false)][String]$UserSid,
+        [Parameter(Mandatory=$false)][String]$Username
+    )
     Get-System -path $WorkingFolder
+    Get-ChromeArtifacts -path $WorkingFolder
+    Get-FirefoxArtifacts -path $WorkingFolder
     Get-OutlookCache -path $WorkingFolder
+    Get-ConnectedDevices -path $WorkingFolder
 }
 
 function Invoke-WithAdminPrivilege {
     Get-EventViewerFiles -path $WorkingFolder
     Get-AllPowershellHistory -path $WorkingFolder
+    Get-TempFiles -path $WorkingFolder
 }
 
-Invoke-WithoutAdminPrivilege
+Invoke-WithoutAdminPrivilege -UserSid $currentUserSid -Username $currentUsername
 if ($isAdmin) {
     Invoke-WithAdminPrivilege
 }
