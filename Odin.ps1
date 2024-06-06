@@ -54,25 +54,28 @@ function Invoke-CheckExecution {
     param (
         [string]$result,
         [string]$artifact,
-        [string]$tab
+        [string]$tab,
+        [string]$file
     )
     if ($tab -eq "yes") {
         # Activated tab
         if ($result -eq $false) {
             Write-Host "    - [FAIL]" -ForegroundColor Red -NoNewline
+            Remove-Item -Path $file -Force 
             Add-Log -message " [FAIL] $(Get-CurrentTime) - $artifact couldn't be copied!!" -path $path
         } else {
-            Write-Host "    - [OK]" -ForegroundColor Green -NoNewline
-            Add-Log -message "[OK] $(Get-CurrentTime) - $artifact copied" -path $path
+            Write-Host "    - [ OK ]" -ForegroundColor Green -NoNewline
+            Add-Log -message "[ OK ] $(Get-CurrentTime) - $artifact copied" -path $path
         }
     } else {
         # Non activated tab
         if ($result -eq $false) {
             Write-Host "[FAIL]" -ForegroundColor Red -NoNewline
+            Remove-Item -Path $file -Force 
             Add-Log -message "[FAIL] $(Get-CurrentTime) - $artifact couldn't be copied!!" -path $path
         } else {
-            Write-Host "[OK]" -ForegroundColor Green -NoNewline
-            Add-Log -message "[OK] $(Get-CurrentTime) - $artifact copied" -path $path
+            Write-Host "[ OK ]" -ForegroundColor Green -NoNewline
+            Add-Log -message "[ OK ] $(Get-CurrentTime) - $artifact copied" -path $path
         }
     }
 }
@@ -86,7 +89,7 @@ function Invoke-CheckExecutionAfterCompressing {
         Write-Host "[FAIL]" -ForegroundColor Red -NoNewline
         Write-Host " Evidences failed to compressed"
     } else {
-        Write-Host "    - [OK]" -ForegroundColor Green -NoNewline
+        Write-Host "    - [ OK ]" -ForegroundColor Green -NoNewline
         Write-Host " Evidences compressed in: $folderPath.zip"
     }
 }
@@ -138,71 +141,71 @@ function Get-System {
     Write-Host "$(Invoke-InfoDot) Starting to extract the characteristics of the environment..."
 
     # Computer Info
-    Get-ComputerInfo >> "$path\System Information\ComputerInfo.txt" ; Invoke-CheckExecution -result $? -artifact "Computer information" -tab yes    
+    Get-ComputerInfo >> "$path\System Information\ComputerInfo.txt" ; Invoke-CheckExecution -result $? -artifact "Computer information" -tab yes -file "$path\System Information\ComputerInfo.txt"
     Write-Host " Computer Information"
     
     # NetIPConfiguration
-    Get-NetIPConfiguration >> "$path\System Information\NetIPConfiguration.txt" ; Invoke-CheckExecution -result $? -artifact "Network configuration" -tab yes
+    Get-NetIPConfiguration >> "$path\System Information\NetIPConfiguration.txt" ; Invoke-CheckExecution -result $? -artifact "Network configuration" -tab yes -file "$path\System Information\NetIPConfiguration.txt"
     Write-Host " Network Configuration"
 
     # Active connections
-    Get-NetTCPConnection >> "$path\System Information\Active Connections.txt" ; Invoke-CheckExecution -result $? -artifact "Active connections" -tab yes
+    Get-NetTCPConnection >> "$path\System Information\Active Connections.txt" ; Invoke-CheckExecution -result $? -artifact "Active connections" -tab yes -file "$path\System Information\Active Connections.txt"
     Write-Host " Active network connections"  
     
     # Firewall Rules
-    Get-NetFirewallRule -ErrorAction SilentlyContinue >> "$path\System Information\Firewall Rules.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes
+    Get-NetFirewallRule -ErrorAction SilentlyContinue >> "$path\System Information\Firewall Rules.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes -file "$path\System Information\Firewall Rules.txt"
     Write-Host " Firewall rules"  
     
     # IP Address
-    Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes
+    Get-NetIPAddress >> "$path\System Information\IPAddresses.txt" ; Invoke-CheckExecution -result $? -artifact "Firewall rules" -tab yes -file "$path\System Information\IPAddresses.txt"
     Write-Host " Network Information"  
     
     # DNS Cache
-    Get-DnsClientCache | Format-List >> "$path\System Information\DNS Cache.txt" ; Invoke-CheckExecution -result $? -artifact "DNS cache" -tab yes
+    Get-DnsClientCache | Format-List >> "$path\System Information\DNS Cache.txt" ; Invoke-CheckExecution -result $? -artifact "DNS cache" -tab yes -file "$path\System Information\DNS Cache.txt"
     Write-Host " DNS cache" 
 
     # Running processes  
-    Get-Process >> "$path\System Information\Running Processes.txt" ; Invoke-CheckExecution -result $? -artifact "Running processes" -tab yes
+    Get-Process >> "$path\System Information\Running Processes.txt" ; Invoke-CheckExecution -result $? -artifact "Running processes" -tab yes -file "$path\System Information\Running Processes.txt"
     Write-Host " Running processes" 
     
     # Running Services
-    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Invoke-CheckExecution -result $? -artifact "Running services" -tab yes
+    Get-Service | Select-Object Name, DisplayName, Status | Format-Table -AutoSize >> "$path\System Information\Running Services.txt" ; Invoke-CheckExecution -result $? -artifact "Running services" -tab yes -file "$path\System Information\Running Services.txt"
     Write-Host " Running services"  
 
     # Process CommandLine
-    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Invoke-CheckExecution -result $? -artifact "Processes commandlines" -tab yes
+    Get-WmiObject Win32_Process | Select-Object Name,  ProcessId, CommandLine, Path | Format-List >> "$path\System Information\Processes CommandLines.txt" ; Invoke-CheckExecution -result $? -artifact "Processes commandlines" -tab yes -file "$path\System Information\Processes CommandLines.txt"
     Write-Host " Process command lines"  
 
     # Network Shares
-    Get-ChildItem -Path HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Invoke-CheckExecution -result $? -artifact "Network shares" -tab yes
+    Get-ChildItem -file HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\ >> "$path\System Information\Network Shares.txt" ; Invoke-CheckExecution -result $? -artifact "Network shares" -tab yes -file "$path\System Information\Network Shares.txt"
     Write-Host " Network shares"  
 
     # SMB Shares
-    Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Invoke-CheckExecution -result $? -artifact "SMB shares" -tab yes
+    Get-SmbShare >> "$path\System Information\SMB Shares.txt" ; Invoke-CheckExecution -result $? -artifact "SMB shares" -tab yes -file "$path\System Information\SMB Shares.txt"
     Write-Host " SMB shares"   
 
     # Recently installed software
-    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Invoke-CheckExecution -result $? -artifact "Recently installed software" -tab yes
+    Get-WinEvent -ProviderName msiinstaller | Where-Object id -eq 1033 | Select-Object timecreated,message | Format-List * >> "$path\System Information\Recently Installed Software.txt" ; Invoke-CheckExecution -result $? -artifact "Recently installed software" -tab yes -file "$path\System Information\Recently Installed Software.txt"
     Write-Host " Recently installed software" 
 
     # Installed Programs
-    Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Invoke-CheckExecution -result $? -artifact "Installed programs" -tab yes
+    Get-WmiObject -Class Win32_Product | Select-Object Name, Version, Vendor | Format-Table -AutoSize >> "$path\System Information\Installed Programs.txt" ; Invoke-CheckExecution -result $? -artifact "Installed programs" -tab yes -file "$path\System Information\Installed Programs.txt"
     Write-Host " Installed programs"   
 
     # Schedule Tasks
-    Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Invoke-CheckExecution -result $? -artifact "Scheduled tasks" -tab yes
+    Get-ScheduledTask | Select-Object Actions, Author, TaskName, TaskPath, URI, Triggers >> "$path\System Information\Scheduled Tasks.txt" ; Invoke-CheckExecution -result $? -artifact "Scheduled tasks" -tab yes -file "$path\System Information\Scheduled Tasks.txt"
     Write-Host " Scheduled tasks"  
 
     # Local users
-    Get-LocalUser | Format-Table >> "$path\System Information\Local Users.txt" ; Invoke-CheckExecution -result $? -artifact "Active users" -tab yes
+    Get-LocalUser | Format-Table >> "$path\System Information\Local Users.txt" ; Invoke-CheckExecution -result $? -artifact "Active users" -tab yes -file "$path\System Information\Local Users.txt"
     Write-Host " Local users"  
 
     # Administrator users
-    $language = (Get-WinSystemLocale).Name; $adminGroupName = if ($language -match 'es-') { "Administradores" } else { "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator_Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath ; Invoke-CheckExecution -result $? -artifact "Administrator users" -tab yes
+    $language = (Get-WinSystemLocale).Name; $adminGroupName = if ($language -match 'es-') { "Administradores" } else { "Administrators" }; $adminGroupMembers = Get-LocalGroupMember -Group $adminGroupName | Select-Object Name, ObjectClass; $outputPath = "$path\System Information\Administrator_Users.txt"; $adminGroupMembers | Out-File -FilePath $outputPath ; Invoke-CheckExecution -result $? -artifact "Administrator users" -tab yes -file "$path\System Information\Administrator_Users.txt"
     Write-Host " Administrator users" 
 
     # RDP Sessions
-    qwinsta /server:localhost >> "$path\System Information\Open Sessions.txt" ; Invoke-CheckExecution -result $? -artifact "Open sessions" -tab yes
+    qwinsta /server:localhost >> "$path\System Information\Open Sessions.txt" ; Invoke-CheckExecution -result $? -artifact "Open sessions" -tab yes -file "$path\System Information\Open Sessions.txt"
     Write-Host " Open Sessions"  
 }
 
@@ -229,7 +232,7 @@ function Get-EventViewerFiles {
         $sourcePath = $_.FullName
         $destinationPath = "$EventViewer\$artifactName"
         Copy-Item -Path $sourcePath -Destination $destinationPath
-        Invoke-CheckExecution -result $? -artifact $artifactName -tab yes -path $path
+        Invoke-CheckExecution -result $? -artifact $artifactName -tab yes -file "$path\Event Viewer\$($artifactName).evtx"
         Write-Host " $($artifactName)"
     }
 } 
@@ -256,6 +259,51 @@ function Get-AllPowershellHistory {
             }
         }
 }  
+
+# Get all files from all the users outlook cache
+function Get-OutlookCache {
+    param (
+        [string]$path
+    )
+    # Define el directorio raíz para guardar las caches de Outlook
+    $rootDestPath = "$path\Outlook Cache"
+
+    # Comienza el proceso de extracción
+    Write-Output "[INFO] Starting to extract Outlook Cache..."
+
+    # Obtiene los perfiles de usuario en el sistema
+    $userProfiles = Get-ChildItem -Path "C:\Users" | Where-Object { $_.PSIsContainer -and $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') }
+
+    foreach ($profile in $userProfiles) {
+        # Define la ruta de la cache de Outlook para cada usuario
+        $cachePath = "C:\Users\$($profile.Name)\AppData\Local\Microsoft\Windows\INetCache\Content.MSO"
+        
+        # Verifica si la ruta de la cache existe
+        if (Test-Path -Path $cachePath) {
+            # Define el directorio de destino para la copia de la cache
+            $destPath = "$rootDestPath\$($profile.Name)"
+            
+            # Intenta crear el directorio de destino y copiar la cache
+            try {
+                New-Item -ItemType Directory -Force -Path $destPath | Out-Null
+                Copy-Item -Path "$cachePath\*" -Destination $destPath -Recurse -Force
+                Write-Host "    - [ OK ]" -NoNewline -ForegroundColor Green
+                Write-Host " $($profile.Name)"
+            } catch {
+                Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
+                Write-Host " $($profile.Name)"
+            }
+        } else {
+            Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
+            Write-Host " $($profile.Name)"
+        }
+    }
+}
+
+# Get a listing of the temp files from each user in the system
+function Get-TempFiles {
+
+}
 
 # Check for Administrator privileges
 $isAdmin = [bool](New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -290,6 +338,7 @@ if ($isAdmin) {
 
 function Invoke-WithoutAdminPrivilege {
     Get-System -path $WorkingFolder
+    Get-OutlookCache -path $WorkingFolder
 }
 
 function Invoke-WithAdminPrivilege {
