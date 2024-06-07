@@ -367,61 +367,90 @@ function Get-ChromeArtifacts {
     Add-Log -message "[INFO] $(Get-CurrentTime) - Looking for installed browsers..." -path $path
     New-Item -Path $path -ItemType Directory -Force -Name "Browsers" | Out-Null
 
+    $chromeArtifacts = @(
+        @{ name = "History"; path = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\History" },
+        @{ name = "Cookies"; path = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cookies" },
+        @{ name = "Cache"; path = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache" },
+        @{ name = "Extensions"; path = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Extensions" },
+        @{ name = "Login Data"; path = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Login Data" }
+    )
+
     $chromeProfilePath = "$env:LOCALAPPDATA\Google\Chrome\User Data"
-    $profiles = Get-ChildItem -Path $chromeProfilePath -Directory
+    $destinationPath = "$path\Browsers\Google Chrome"
 
-
-    if (Test-Path $chromeProfilePath) {
+    if (Test-Path "$chromeProfilePath") {
         Write-Host "    - " -NoNewline
         Write-Host "$(Invoke-InfoDot) Collecting Google Chrome artifacts..."
         Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting Google Chrome artifacts..." -path $path
         New-Item -Path "$path\Browsers" -ItemType Directory -Force -Name "Google Chrome" | Out-Null
-        $destinationPath = "$path\Browsers\Google Chrome"
-    
-    
-        foreach ($profile in $profiles) {
-            $profileName = $profile.Name
-            $profilePath = $profile.FullName
-            $profileDestination = Join-Path -Path $destinationPath -ChildPath $profileName
-    
-            # Crear subdirectorio para el perfil si no existe
-            if (-not (Test-Path $profileDestination)) {
-                New-Item -ItemType Directory -Path $profileDestination -Force | Out-Null
-            }
-    
-            # Artefactos específicos para recolectar
-            $artifacts = @(
-                @{ Name = "History"; Path = "History" },
-                @{ Name = "Cookies"; Path = "Cookies" },
-                @{ Name = "Cache"; Path = "Cache" },
-                @{ Name = "Login Data"; Path = "Login Data" },
-                @{ Name = "Extensions"; Path = "Extensions" }
-            )
-    
-            foreach ($artifact in $artifacts) {
-                $filePath = Join-Path -Path $profilePath -ChildPath $artifact.Path
-                $destFilePath = Join-Path -Path $profileDestination -ChildPath $artifact.Name
-    
-                if (Test-Path $filePath) {
-                    if ($artifact.Name -eq "Extensions" -or $artifact.Name -eq "Cache") {
-                        # Para Carpetas
-                        $destDir = Join-Path -Path $profileDestination -ChildPath $artifact.Name
-                        if (Test-Path $destDir) { Remove-Item -Path $destDir -Recurse -Force }
-                        Copy-Item -Path $filePath -Destination $destDir -Recurse -Force
-                    } else {
-                        # Para Archivos
-                        Copy-Item -Path $filePath -Destination $destFilePath -Force
-                    }
+
+        foreach ($artifact in $chromeArtifacts) {
+            $filePath = $artifact.path
+            $destFilePath = "$destinationPath\$($artifact.name)"
+
+            if (Test-Path "$filePath") {
+                if ($artifact.name -eq "Extensions" -or $artifact.name -eq "Cache") {
+                    # Para Carpetas
+                    $destDir = $destFilePath
+                    if (Test-Path "$destDir") { Remove-Item -Path "$destDir" -Recurse -Force }
+                    Copy-Item -Path "$filePath" -Destination "$destDir" -Recurse -Force
+                } else {
+                    # Para Archivos
+                    Copy-Item -Path "$filePath" -Destination "$destFilePath" -Force
                 }
             }
         }
+
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
-    } else {
-        Write-Host "        - [FAIL]" -NoNewline -ForegroundColor Red
-        Write-Host " Chrome profile path not found: $firefoxProfilePath"
-    }
+    } 
 }
+
+function Get-EdgeArtifacts {
+    param(
+        [string]$path
+    )
+
+    $edgeArtifacts = @(
+        @{ name = "History"; path = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\History" },
+        @{ name = "Cookies"; path = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cookies" },
+        @{ name = "Cache"; path = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache" },
+        @{ name = "Extensions"; path = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Extensions" },
+        @{ name = "Login Data"; path = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Login Data" }
+    )
+
+    $edgeProfilePath = "$env:LOCALAPPDATA\Microsoft\Edge\User Data"
+    $destinationPath = "$path\Browsers\Microsoft Edge"
+
+    if (Test-Path "$edgeProfilePath") {
+        Write-Host "`n" -NoNewline
+        Write-Host "    - " -NoNewline
+        Write-Host "$(Invoke-InfoDot) Collecting Microsoft Edge artifacts..."
+        Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting Microsoft Edge artifacts..." -path $path
+        New-Item -Path "$path\Browsers" -ItemType Directory -Force -Name "Microsoft Edge" | Out-Null
+
+        foreach ($artifact in $edgeArtifacts) {
+            $filePath = $artifact.path
+            $destFilePath = "$destinationPath\$($artifact.name)"
+
+            if (Test-Path "$filePath") {
+                if ($artifact.name -eq "Extensions" -or $artifact.name -eq "Cache") {
+                    # Para Carpetas
+                    $destDir = $destFilePath
+                    if (Test-Path "$destDir") { Remove-Item -Path "$destDir" -Recurse -Force }
+                    Copy-Item -Path "$filePath" -Destination "$destDir" -Recurse -Force
+                } else {
+                    # Para Archivos
+                    Copy-Item -Path "$filePath" -Destination "$destFilePath" -Force
+                }
+            }
+        }
+
+        Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
+        Write-Host " Artifacts have been collected"
+    } 
+}
+
 
 function Get-FirefoxArtifacts {
     param (
@@ -475,9 +504,96 @@ function Get-FirefoxArtifacts {
         }
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
-    } else {
-        Write-Host "        - [FAIL]" -NoNewline -ForegroundColor Red
-        Write-Host " Firefox profile path not found: $firefoxProfilePath"
+    } 
+}
+
+function Get-OperaArtifacts {
+    param(
+        [string]$path
+    )
+
+    $operaArtifacts = @(
+        @{ name = "History"; path = "$env:APPDATA\Opera Software\Opera Stable\History" },
+        @{ name = "Cookies"; path = "$env:APPDATA\Opera Software\Opera Stable\Cookies" },
+        @{ name = "Cache"; path = "$env:LOCALAPPDATA\Opera Software\Opera Stable\Cache" },
+        @{ name = "Extensions"; path = "$env:APPDATA\Opera Software\Opera Stable\Extensions" },
+        @{ name = "Login Data"; path = "$env:APPDATA\Opera Software\Opera Stable\Login Data" }
+    )
+
+    $operaProfilePath = "$env:APPDATA\Opera Software\Opera Stable"
+    $destinationPath = "$path\Browsers\Opera"
+
+    if (Test-Path "$operaProfilePath") {
+        Write-Host "`n" -NoNewline
+        Write-Host "    - " -NoNewline
+        Write-Host "$(Invoke-InfoDot) Collecting Opera artifacts..."
+        Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting Opera artifacts..." -path $path
+        New-Item -Path "$path\Browsers" -ItemType Directory -Force -Name "Opera" | Out-Null
+
+        foreach ($artifact in $operaArtifacts) {
+            $filePath = $artifact.path
+            $destFilePath = "$destinationPath\$($artifact.name)"
+
+            if (Test-Path "$filePath") {
+                if ($artifact.name -eq "Extensions" -or $artifact.name -eq "Cache") {
+                    # Para Carpetas
+                    $destDir = $destFilePath
+                    if (Test-Path "$destDir") { Remove-Item -Path "$destDir" -Recurse -Force }
+                    Copy-Item -Path "$filePath" -Destination "$destDir" -Recurse -Force
+                } else {
+                    # Para Archivos
+                    Copy-Item -Path "$filePath" -Destination "$destFilePath" -Force
+                }
+            }
+        }
+
+        Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
+        Write-Host " Artifacts have been collected"
+    }
+}
+
+function Get-BraveArtifacts {
+    param(
+        [string]$path
+    )
+	
+    $braveArtifacts = @(
+        @{ name = "History"; path = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default\History" },
+        @{ name = "Cookies"; path = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default\Cookies" },
+        @{ name = "Cache"; path = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default\Cache" },
+        @{ name = "Extensions"; path = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default\Extensions" },
+        @{ name = "Login Data"; path = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data\Default\Login Data" }
+    )
+
+    $braveProfilePath = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data"
+    $destinationPath = "$path\Browsers\Brave"
+
+    if (Test-Path "$braveProfilePath") {
+        Write-Host "`n" -NoNewline
+		Write-Host "    - " -NoNewline
+        Write-Host "$(Invoke-InfoDot) Collecting Brave artifacts..."
+        Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting Brave artifacts..." -path $path
+        New-Item -Path "$path\Browsers" -ItemType Directory -Force -Name "Brave" | Out-Null
+
+        foreach ($artifact in $braveArtifacts) {
+            $filePath = $artifact.path
+            $destFilePath = "$destinationPath\$($artifact.name)"
+
+            if (Test-Path "$filePath") {
+                if ($artifact.name -eq "Extensions" -or $artifact.name -eq "Cache") {
+                    # Para Carpetas
+                    $destDir = $destFilePath
+                    if (Test-Path "$destDir") { Remove-Item -Path "$destDir" -Recurse -Force }
+                    Copy-Item -Path "$filePath" -Destination "$destDir" -Recurse -Force
+                } else {
+                    # Para Archivos
+                    Copy-Item -Path "$filePath" -Destination "$destFilePath" -Force
+                }
+            }
+        }
+
+        Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
+        Write-Host " Artifacts have been collected"
     }
 }
 
@@ -519,7 +635,10 @@ function Invoke-WithoutAdminPrivilege {
     )
     Get-System -path $WorkingFolder
     Get-ChromeArtifacts -path $WorkingFolder
+    Get-EdgeArtifacts -path $WorkingFolder
     Get-FirefoxArtifacts -path $WorkingFolder
+    Get-OperaArtifacts -path $WorkingFolder
+    Get-BraveArtifacts -path $WorkingFolder
     Get-OutlookCache -path $WorkingFolder
     Get-ConnectedDevices -path $WorkingFolder
 }
