@@ -22,7 +22,11 @@ Odin collects information from multiple sources and structures the output in the
 - Local users
 - Administrator users
 - RDP Sessions
+- Browsers artifacts (Chrome, Edge, Firefox...)
+- Outlook cache
+- Plug And Play (PnP) devices
 
 For the best experience run the script as admin, then the following items will also be collected:
 - Windows Security Events
 - Powershell History of all users
+- Temp files
