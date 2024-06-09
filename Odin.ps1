@@ -16,7 +16,7 @@ function Invoke-Clear {
 }
 
 Invoke-Clear
-
+<#
 $Version = '1.0'
 $ASCIIBanner = @"                                                                                                                                                              
                    -                                            ####             ####               
@@ -42,6 +42,7 @@ Write-Host "Version: $Version" -ForegroundColor Cyan
 Write-Host "Coded by Alberto Aparicio (alberto.aparicio@masorange.es)" -ForegroundColor Cyan
 Write-Host "+O Incident Response Team - Tech Ops" -ForegroundColor Cyan
 Write-Host "===================================================================================================`n" -ForegroundColor Green
+#>
 
 function Invoke-InfoDot {
     Write-Host "[INFO]" -ForegroundColor Cyan -NoNewline
