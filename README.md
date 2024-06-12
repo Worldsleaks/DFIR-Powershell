@@ -30,3 +30,4 @@ For the best experience run the script as admin, then the following items will a
 - Windows Security Events
 - Powershell History of all users
 - Temp files
+- Prefetch files
