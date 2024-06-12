@@ -16,7 +16,7 @@ function Invoke-Clear {
 }
 
 Invoke-Clear
-<#
+
 $Version = '1.0'
 $ASCIIBanner = @"                                                                                                                                                              
                    -                                            ####             ####               
@@ -42,7 +42,6 @@ Write-Host "Version: $Version" -ForegroundColor Cyan
 Write-Host "Coded by Alberto Aparicio (alberto.aparicio@masorange.es)" -ForegroundColor Cyan
 Write-Host "+O Incident Response Team - Tech Ops" -ForegroundColor Cyan
 Write-Host "===================================================================================================`n" -ForegroundColor Green
-#>
 
 function Invoke-InfoDot {
     Write-Host "[INFO]" -ForegroundColor Cyan -NoNewline
@@ -404,6 +403,7 @@ function Get-ChromeArtifacts {
 
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
+        Add-Log -message "[ OK ] $(Get-CurrentTime) - Chrome artifacts collected successfully" -path $path
     } 
 }
 
@@ -449,6 +449,7 @@ function Get-EdgeArtifacts {
 
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
+        Add-Log -message "[ OK ] $(Get-CurrentTime) - Edge artifacts collected successfully" -path $path
     } 
 }
 
@@ -505,6 +506,7 @@ function Get-FirefoxArtifacts {
         }
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
+        Add-Log -message "[ OK ] $(Get-CurrentTime) - Firefox artifacts collected successfully" -path $path
     } 
 }
 
@@ -550,6 +552,7 @@ function Get-OperaArtifacts {
 
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
+        Add-Log -message "[ OK ] $(Get-CurrentTime) - Opera artifacts collected successfully" -path $path
     }
 }
 
@@ -595,8 +598,53 @@ function Get-BraveArtifacts {
 
         Write-Host "        - [ OK ]" -NoNewline -ForegroundColor Green
         Write-Host " Artifacts have been collected"
+        Add-Log -message "[ OK ] $(Get-CurrentTime) - Brave artifacts collected successfully" -path $path
     }
 }
+
+function Get-Prefetch {
+    param (
+        [string]$path
+    )
+    
+    $prefetchPath = "C:\Windows\Prefetch"
+    
+    New-Item -Path "$path" -ItemType Directory -Force -Name "Prefetch Files" | Out-Null
+    $outputDirectory = "$path\Prefetch Files"
+    $prefetchListFile = "$outputDirectory\PrefetchList.txt"
+    
+    Write-Host "`n" -NoNewline
+    Write-Host "$(Invoke-InfoDot) Collecting prefetch files..."
+    Add-Log -message "[INFO] $(Get-CurrentTime) - Collecting prefetch files..." -path $path
+    
+    # Check if the Prefetch directory exists
+    if (Test-Path -Path $prefetchPath) {
+        # Copy all prefetch files to the specified output directory and list them
+        Add-Content -Path $prefetchListFile -Value "File Name`tCreation Time`tLast Access Time`tSize"
+        Get-ChildItem -Path $prefetchPath -File | ForEach-Object {
+            $fileInfo = $_
+            try {
+                $destinationPath = Join-Path -Path $outputDirectory -ChildPath $fileInfo.Name
+                Copy-Item -Path $fileInfo.FullName -Destination $destinationPath -Force
+                $fileDetails = "{0}`t{1}`t{2}`t{3} KB" -f $fileInfo.Name.PadRight(50), $fileInfo.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"), $fileInfo.LastAccessTime.ToString("yyyy-MM-dd HH:mm:ss"), ($fileInfo.Length / 1KB -as [int]).ToString().PadLeft(5)
+                Add-Content -Path $prefetchListFile -Value $fileDetails
+            } catch {
+                Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
+                Write-Host " Error processing file $($fileInfo.Name): $_"
+                Add-Log -message "[FAIL] $(Get-CurrentTime) - Error processing file $($fileInfo.Name): $_" -path $path
+            }
+        }
+        Write-Host "    - [ OK ]" -NoNewline -ForegroundColor Green
+        Write-Host " Prefetch files collected successfully"
+        Add-Log -message "[ OK ] $(Get-CurrentTime) - Prefetch files collected successfully" -path $path
+    } else {
+        Write-Host "    - [FAIL]" -NoNewline -ForegroundColor Red
+        Write-Host " Prefetch directory does not exist"
+        Add-Log -message "[FAIL] $(Get-CurrentTime) - Prefetch directory does not exist" -path $path
+    }
+}
+
+
 
 # Check for Administrator privileges
 $isAdmin = [bool](New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -634,20 +682,21 @@ function Invoke-WithoutAdminPrivilege {
         [Parameter(Mandatory=$false)][String]$UserSid,
         [Parameter(Mandatory=$false)][String]$Username
     )
-    Get-System -path $WorkingFolder
-    Get-ChromeArtifacts -path $WorkingFolder
-    Get-EdgeArtifacts -path $WorkingFolder
-    Get-FirefoxArtifacts -path $WorkingFolder
-    Get-OperaArtifacts -path $WorkingFolder
-    Get-BraveArtifacts -path $WorkingFolder
-    Get-OutlookCache -path $WorkingFolder
-    Get-ConnectedDevices -path $WorkingFolder
+    #Get-System -path $WorkingFolder
+    #Get-ChromeArtifacts -path $WorkingFolder
+    #Get-EdgeArtifacts -path $WorkingFolder
+    #Get-FirefoxArtifacts -path $WorkingFolder
+    # Get-OperaArtifacts -path $WorkingFolder
+    #Get-BraveArtifacts -path $WorkingFolder
+    #Get-OutlookCache -path $WorkingFolder
+    #Get-ConnectedDevices -path $WorkingFolder
 }
 
 function Invoke-WithAdminPrivilege {
-    Get-EventViewerFiles -path $WorkingFolder
-    Get-AllPowershellHistory -path $WorkingFolder
-    Get-TempFiles -path $WorkingFolder
+    #Get-EventViewerFiles -path $WorkingFolder
+    #Get-AllPowershellHistory -path $WorkingFolder
+    #Get-TempFiles -path $WorkingFolder
+    Get-Prefetch -path $WorkingFolder
 }
 
 Invoke-WithoutAdminPrivilege -UserSid $currentUserSid -Username $currentUsername
